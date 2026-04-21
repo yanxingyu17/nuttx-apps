@@ -47,7 +47,7 @@
 #define IMAGE_JPG_SIZE     (512*1024)  /* 512kB for FullHD Jpeg file. */
 #define IMAGE_RGB_SIZE     (320*240*2) /* QVGA RGB565 */
 
-#define VIDEO_BUFNUM       (3)
+#define VIDEO_BUFNUM       (1)
 #define STILL_BUFNUM       (1)
 
 #define MAX_CAPTURE_NUM     (100)
@@ -535,7 +535,8 @@ int main(int argc, FAR char *argv[])
    * And all allocated memorys are VIDIOC_QBUFed.
    */
 
-  if (capture_num != 0)
+  if (capture_num != 0 &&
+      capture_type == V4L2_BUF_TYPE_STILL_CAPTURE)
     {
       /* Determine image size from connected image sensor name,
        * because video driver does not support VIDIOC_ENUM_FRAMESIZES
@@ -756,9 +757,6 @@ exit_this_app:
   /* Close video device file makes dequeue all buffers */
 
   close(v_fd);
-
-  free_buffer(buffers_video, VIDEO_BUFNUM);
-  free_buffer(buffers_still, STILL_BUFNUM);
 
 exit_without_cleaning_buffer:
   capture_uninitialize(CAMERA_DEV_PATH);
