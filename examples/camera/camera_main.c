@@ -717,19 +717,70 @@ int main(int argc, FAR char *argv[])
                     goto exit_this_app;
                   }
 
-                futil_writeimage(
-                  (FAR uint8_t *)v4l2_buf.m.userptr,
-                  (size_t)v4l2_buf.bytesused,
-                  capture_type == V4L2_BUF_TYPE_VIDEO_CAPTURE ?
-                  "RGB" : "JPG");
+                capture_num--;
+
+                if (capture_num == 0)
+                  {
+                    int fbfd = open("/dev/fb0", O_RDWR);
+                    if (fbfd >= 0)
+                      {
+                        struct { uint8_t fmt; uint8_t p1;
+                                 uint16_t xr; uint16_t yr;
+                                 uint8_t np; } lvi;
+                        struct { void *mem; uint32_t len;
+                                 uint16_t st; uint8_t d;
+                                 uint8_t bp; } lpi;
+                        ioctl(fbfd, 0x2801, (uintptr_t)&lvi);
+                        ioctl(fbfd, 0x2802, (uintptr_t)&lpi);
+
+                        if (lpi.mem && lpi.len > 0)
+                          {
+                            FAR uint16_t *src =
+                              (FAR uint16_t *)v4l2_buf.m.userptr;
+                            FAR uint8_t *fb = lpi.mem;
+                            uint32_t stride = lpi.st > 0
+                                              ? lpi.st : 480;
+                            uint32_t r;
+                            uint32_t xo = (320 - 240) / 2;
+
+                            memset(fb, 0, lpi.len);
+                            for (r = 0; r < 240; r++)
+                              {
+                                memcpy(fb + r * stride,
+                                       (uint8_t *)(src
+                                       + r * 320 + xo),
+                                       240 * 2);
+                              }
+
+                            uint16_t area[4];
+                            area[0] = 0;
+                            area[1] = 0;
+                            area[2] = 240;
+                            area[3] = 240;
+                            ioctl(fbfd, 0x2807,
+                                  (uintptr_t)area);
+                            printf("LCD: 240x240 crop "
+                                   "(stride=%u)\n", stride);
+                          }
+
+                        close(fbfd);
+                      }
+                  }
+                else
+                  {
+                    futil_writeimage(
+                      (FAR uint8_t *)v4l2_buf.m.userptr,
+                      (size_t)v4l2_buf.bytesused,
+                      capture_type ==
+                        V4L2_BUF_TYPE_VIDEO_CAPTURE
+                        ? "RGB" : "JPG");
+                  }
 
                 ret = release_camimage(v_fd, &v4l2_buf);
                 if (ret != OK)
                   {
                     goto exit_this_app;
                   }
-
-                capture_num--;
               }
 
             ret = stop_stillcapture(v_fd, capture_type);
